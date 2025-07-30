@@ -1,32 +1,50 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Image Text Editor</title>
+  <title>Advanced Image Text Editor</title>
   <style>
-    body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; }
-    #canvas { border: 1px solid #ccc; margin-top: 20px; }
-    button { padding: 8px 15px; margin-right: 10px; }
+    body { font-family: 'Arial', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    #canvas { border: 1px solid #ddd; margin: 20px 0; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .toolbar { margin: 15px 0; }
+    button, select, input { 
+      padding: 8px 12px; 
+      margin-right: 8px; 
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button { background: #4285f4; color: white; cursor: pointer; }
+    .loading { display: none; color: #666; }
   </style>
 </head>
 <body>
   <h1>Image Text Editor</h1>
-  <input type="file" id="imageUpload" accept="image/*">
-  <button onclick="addText()">Add Text</button>
-  <button onclick="download()">Export PNG</button>
+  
+  <div class="toolbar">
+    <input type="file" id="imageUpload" accept="image/*">
+    <button onclick="addText()">Add Text</button>
+    <button onclick="extractText()">Extract Text (OCR)</button>
+    <button onclick="download()">Export PNG</button>
+    <span id="loading" class="loading">Processing...</span>
+  </div>
+
   <div>
     <canvas id="canvas" width="700" height="500"></canvas>
   </div>
 
+  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
   <script>
     const canvas = new fabric.Canvas('canvas');
-    let text = new fabric.Textbox('Edit me', { left: 100, top: 100 });
+    let activeText = null;
 
     // 1. Image Upload
     document.getElementById('imageUpload').addEventListener('change', function(e) {
       const file = e.target.files[0];
-      const reader = new FileReader();
+      if (!file) return;
       
+      const reader = new FileReader();
       reader.onload = function(event) {
         fabric.Image.fromURL(event.target.result, function(img) {
           canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
@@ -37,14 +55,44 @@
 
     // 2. Add Text
     function addText() {
+      const text = new fabric.Textbox('Double-click to edit', {
+        left: 50,
+        top: 50,
+        fontFamily: 'Arial',
+        fontSize: 20,
+        fill: '#000000',
+        editable: true
+      });
       canvas.add(text);
       canvas.setActiveObject(text);
+      activeText = text;
     }
 
-    // 3. Export as PNG
+    // 3. Extract Text (OCR)
+    async function extractText() {
+      const loading = document.getElementById('loading');
+      loading.style.display = 'inline';
+      
+      try {
+        const imageData = canvas.toDataURL('image/png');
+        const { data: { text } } = await Tesseract.recognize(
+          imageData,
+          'eng',
+          { logger: m => console.log(m) }
+        );
+        
+        alert(`Extracted Text:\n\n${text}`);
+      } catch (error) {
+        alert('OCR failed. Try a clearer image.');
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+
+    // 4. Export as PNG
     function download() {
       const link = document.createElement('a');
-      link.download = 'image-with-text.png';
+      link.download = 'edited-image.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
     }
